@@ -1,0 +1,88 @@
+name: Release
+
+# Bump "version" in .gemini-plugin/plugin.json and add a matching CHANGELOG.md
+# entry in a pull request. Pull requests validate the package. Merging to main
+# tags v<version> and publishes a GitHub release when that tag does not exist.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate package
+        id: check
+        shell: node {0}
+        run: |
+          const fs = require("fs");
+          const errors = [];
+          const manifest = JSON.parse(fs.readFileSync(".gemini-plugin/plugin.json", "utf8"));
+          JSON.parse(fs.readFileSync(".mcp.json", "utf8"));
+
+          const { version } = manifest;
+          if (!/^\d+\.\d+\.\d+$/.test(version ?? "")) errors.push(`version "${version}" is not MAJOR.MINOR.PATCH`);
+          if (!fs.readFileSync("CHANGELOG.md", "utf8").includes(`## [${version}]`)) {
+            errors.push(`CHANGELOG.md has no "## [${version}]" entry`);
+          }
+
+          for (const path of manifest.skills ?? []) {
+            if (!fs.existsSync(path)) {
+              errors.push(`${path} is listed in the manifest but does not exist`);
+              continue;
+            }
+            const text = fs.readFileSync(path, "utf8");
+            const frontmatter = text.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? "";
+            const name = frontmatter.match(/^name:\s*(.+)$/m)?.[1].trim();
+            const description = frontmatter.match(/^description:\s*(.+)$/m)?.[1].trim() ?? "";
+            if (name !== path.split("/").at(-2)) errors.push(`${path}: name "${name}" does not match its folder`);
+            if (!description || description.length > 1024) errors.push(`${path}: description must be 1-1,024 chars`);
+            if (text.split("\n").length > 500) errors.push(`${path}: more than 500 lines`);
+          }
+
+          if (errors.length) {
+            errors.forEach((e) => console.log(`::error::${e}`));
+            process.exit(1);
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
+          console.log(`Package valid: version ${version}`);
+
+  release:
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; nothing to do."
+            exit 0
+          fi
+          # Release notes: the CHANGELOG.md section for this version, without its heading.
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file notes.md
