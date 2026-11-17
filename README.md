@@ -30,7 +30,7 @@ Once connected, try asking Gemini:
 
 - Show my assigned Linear issues, grouped by priority.
 - Summarize recent updates to my Linear projects.
-- Find a Linear document about our roadmap and summarize it.
+- What did my team complete in Linear last week?
 
 ## Support
 
