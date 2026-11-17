@@ -24,7 +24,13 @@ The Linear MCP server uses OAuth 2.1. The first time the assistant calls a Linea
 
 Install **Linear** from the Gemini plugin marketplace, then sign in to Linear when prompted.
 
-Once connected, ask Gemini to work with Linear, for example: "Find my open Linear issues."
+## Example prompts
+
+Once connected, try asking Gemini:
+
+- Show my assigned Linear issues, grouped by priority.
+- Summarize recent updates to my Linear projects.
+- Find a Linear document about our roadmap and summarize it.
 
 ## Support
 
