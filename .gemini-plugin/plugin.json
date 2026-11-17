@@ -1,7 +1,7 @@
 {
   "name": "linear",
   "displayName": "Linear",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Find, create, and update Linear issues, plan projects and milestones, post status updates, and read or write Linear documents.",
   "author": {
     "name": "Linear",
